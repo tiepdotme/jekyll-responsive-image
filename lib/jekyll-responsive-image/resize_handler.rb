@@ -17,7 +17,8 @@ module Jekyll
 
           image_path = img.filename.force_encoding(Encoding::UTF_8)
           filepath = format_output_path(config['output_path_format'], config, image_path, width, height)
-          resized.push(image_hash(config, filepath, width, height))
+          output_image_hash = image_hash(config, filepath, width, height)
+          resized.push(output_image_hash)
 
           site_source_filepath = File.expand_path(filepath, config[:site_source])
           site_dest_filepath = File.expand_path(filepath, config[:site_dest])
@@ -39,10 +40,17 @@ module Jekyll
           if config['strip']
             img.strip!
           end
-          i = img.scale(ratio)
-          i.write(target_filepath) do |f|
-            f.interlace = i.interlace
-            f.quality = size['quality'] || config['default_quality']
+
+          # Don't resize ignored images, just copy them
+          if config['ignored_extensions'].include?(output_image_hash['extension'])
+            FileUtils.copy_file(image_path, target_filepath)
+          else
+            i = img.scale(ratio)
+            i.write(target_filepath) do |f|
+              f.interlace = i.interlace
+              f.quality = size['quality'] || config['default_quality']
+            end
+            i.destroy!
           end
 
           if config['save_to_source']
@@ -50,8 +58,6 @@ module Jekyll
             Jekyll.logger.info "Copying resized image to #{site_dest_filepath}"
             FileUtils.copy_file(site_source_filepath, site_dest_filepath)
           end
-
-          i.destroy!
         end
 
         img.destroy!
